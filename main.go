@@ -69,7 +69,6 @@ func createForm(rf *RequestForm) *huh.Form {
 				Key("name").
 				Title("URL").
 				Value(&rf.name).
-				Prompt("?").
 				Validate(func(s string) error {
 					if s == "" {
 						return nil
