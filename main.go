@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -26,7 +27,25 @@ type model struct {
 	sent     bool // Track if request was sent
 	db       *sql.DB
 	loading  bool
+
+	ready    bool
+	viewport viewport.Model
 }
+
+var (
+	titleStyle = func() lipgloss.Style {
+		b := lipgloss.RoundedBorder()
+		b.Right = "├"
+		return lipgloss.NewStyle().BorderStyle(b).Padding(0, 1)
+	}()
+
+	infoStyle = func() lipgloss.Style {
+		b := lipgloss.RoundedBorder()
+		b.Left = "┤"
+		return titleStyle.BorderStyle(b)
+	}()
+)
+const useHighPerformanceRenderer = false
 
 func initialModel(db *sql.DB) model {
 	m := model{
@@ -57,10 +76,13 @@ func createForm(rf *models.Requests) *huh.Form {
 				Value(&rf.Method),
 			huh.NewInput().
 				Key("name").
+				Value(&rf.Name).
 				Title("name"),
+
 			huh.NewInput().
 				Key("route").
 				Title("URL").
+				Value(&rf.Route).
 				Validate(func(s string) error {
 					if s == "" {
 						return nil
@@ -90,13 +112,30 @@ func (m model) Init() tea.Cmd {
 	return m.form.Init()
 }
 
+
+
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		if !m.ready {
+
+			m.viewport = viewport.New(msg.Width, msg.Height-30)
+			m.viewport.YPosition = m.height
+			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
+			m.viewport.SetContent(m.preview)
+			m.ready = true
+
+		}
+
+		if useHighPerformanceRenderer {
+			cmds = append(cmds, viewport.Sync(m.viewport))
+		}
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -107,12 +146,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.sent {
 				requestReturn, err := requests.MakeRequest(m.requests, m.db)
 				if err != nil {
-					m.preview += err.Error()
+					m.preview = err.Error()
 				} else {
-					m.preview += requestReturn
+					m.preview = requestReturn
+					m.viewport.SetContent(requestReturn)
 				}
-				return m, tea.Batch(cmds...)
-
 			}
 		case "esc":
 			if m.sent {
@@ -141,31 +179,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		send := m.form.GetBool("send")
 
 		if send == true {
-			m.loading = true
 			requestReturn, err := requests.MakeRequest(request_form, m.db)
 			if err != nil {
-				m.preview += err.Error()
+				m.preview = err.Error()
 			} else {
+        m.preview += "requestReturn"
 				m.preview += requestReturn
+				m.viewport.SetContent(requestReturn)
 			}
 			m.sent = true
 		}
 	}
+
+	m.viewport, cmd = m.viewport.Update(msg)
+	cmds = append(cmds, cmd)
 	return m, tea.Batch(cmds...)
 }
-
-/*
-func (m *model) updatePreview() {
-	preview := "Current Request:\n\n"
-
-	preview += fmt.Sprintf("Method: %s\n", m.request_form.Method)
-	preview += fmt.Sprintf("URL: %s\n", m.request_form.Name)
-	preview += fmt.Sprintf("Body: %s\n", m.request_form.Body)
-	preview += fmt.Sprintf("Send: %t\n", m.request_form.Send)
-
-	m.preview = preview
-}
-*/
 
 func widthCalc(m_width int, padding int, v_width float64) int {
 	width := (float64(m_width) * v_width) - float64(padding)
@@ -184,6 +213,7 @@ func (m model) formView(v_width float64) string {
 	}
 
 	width := widthCalc(m.width, m.padding, v_width)
+
 	v := strings.TrimSuffix(m.form.View(), "\n\n")
 	form := m.lg.NewStyle().Margin(1, 0).Render(v)
 	return lipgloss.NewStyle().
@@ -193,14 +223,31 @@ func (m model) formView(v_width float64) string {
 		Render(form)
 }
 
+func (m model) headerView() string {
+	title := titleStyle.Render("Preview")
+	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
+	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
+}
+
+func (m model) footerView() string {
+	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
+	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
+	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
+}
+
 func (m model) previewView(v_width float64) string {
 	width := widthCalc(m.width, m.padding, v_width)
+	m.viewport.Width = width - m.padding - 5
+
+	content := fmt.Sprintf("%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView())
+
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("1")).
 		Padding(m.padding).
 		Width(width).
-		Render(m.preview)
+		Render(content)
 }
 
 func (m model) View() string {
@@ -214,6 +261,7 @@ func (m model) View() string {
 	)
 }
 
+
 func main() {
 
 	db := database.SqliteDB()
@@ -224,6 +272,7 @@ func main() {
 	p := tea.NewProgram(
 		initialModel(db),
 		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
 	)
 
 	if _, err := p.Run(); err != nil {
