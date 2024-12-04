@@ -1,7 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"main/database"
+	"main/models"
+	"main/requests"
 	"net/url"
 	"os"
 	"strings"
@@ -11,48 +15,34 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type Requests struct {
-	id     int
-	name   string
-	method string
-	route  string
-	params url.Values
-}
-
-type RequestForm struct {
-	name   string
-	body   string
-	method string
-	send   bool
-}
-
 type model struct {
-	form         *huh.Form
-	request_form RequestForm
-	requests     Requests
-	lg           *lipgloss.Renderer
-	preview      string
-	padding      int
-	width        int
-	height       int
-	sent         bool // Track if request was sent
+	form     *huh.Form
+	requests models.Requests
+	lg       *lipgloss.Renderer
+	preview  string
+	padding  int
+	width    int
+	height   int
+	sent     bool // Track if request was sent
+	db       *sql.DB
+	loading  bool
 }
 
-func initialModel() model {
+func initialModel(db *sql.DB) model {
 	m := model{
-		padding: 2,
-		lg:      lipgloss.DefaultRenderer(),
-		request_form: RequestForm{
-			method: "GET",
-		},
-		sent: false,
+		padding:  2,
+		db:       db,
+		lg:       lipgloss.DefaultRenderer(),
+		sent:     false,
+		requests: models.Requests{Method: "GET"},
 	}
 
-	m.form = createForm(&m.request_form)
+	m.form = createForm(&m.requests)
+
 	return m
 }
 
-func createForm(rf *RequestForm) *huh.Form {
+func createForm(rf *models.Requests) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -64,11 +54,13 @@ func createForm(rf *RequestForm) *huh.Form {
 					huh.NewOption("PUT", "PUT"),
 					huh.NewOption("DELETE", "DELETE"),
 				).
-				Value(&rf.method),
+				Value(&rf.Method),
 			huh.NewInput().
 				Key("name").
+				Title("name"),
+			huh.NewInput().
+				Key("route").
 				Title("URL").
-				Value(&rf.name).
 				Validate(func(s string) error {
 					if s == "" {
 						return nil
@@ -79,15 +71,14 @@ func createForm(rf *RequestForm) *huh.Form {
 					return nil
 				}),
 			huh.NewText().
-				Key("body").
-				Value(&rf.body).
+				Key("params").
+				Value(&rf.Params).
 				Title("Body"),
+
 			huh.NewConfirm().
 				Key("send").
 				Title("Send Request?").
-				Affirmative("Send").
-				Negative("Cancel").
-				Value(&rf.send),
+				Affirmative("Send"),
 		),
 	).
 		WithWidth(45).
@@ -114,7 +105,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if m.sent {
-				m.preview += "Resended \n"
+				requestReturn, err := requests.MakeRequest(m.requests, m.db)
+				if err != nil {
+					m.preview += err.Error()
+				} else {
+					m.preview += requestReturn
+				}
 				return m, tea.Batch(cmds...)
 
 			}
@@ -122,7 +118,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.sent {
 				// Reset the form
 				m.sent = false
-				m.form = createForm(&m.request_form)
+				m.form = createForm(&m.requests)
 				return m, m.form.Init()
 			}
 		}
@@ -136,30 +132,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if f, ok := form.(*huh.Form); ok {
 		m.form = f
-		m.request_form.method = m.form.GetString("method")
-		m.request_form.name = m.form.GetString("name")
-		m.request_form.body = m.form.GetString("body")
-		m.request_form.send = m.form.GetBool("send")
+		request_form := models.Requests{}
+		request_form.Method = m.form.GetString("method")
+		request_form.Name = m.form.GetString("name")
+		request_form.Route = m.form.GetString("route")
+		request_form.Params = m.form.GetString("params")
+		m.requests = request_form
+		send := m.form.GetBool("send")
 
-		if m.request_form.send == true {
+		if send == true {
+			m.loading = true
+			requestReturn, err := requests.MakeRequest(request_form, m.db)
+			if err != nil {
+				m.preview += err.Error()
+			} else {
+				m.preview += requestReturn
+			}
 			m.sent = true
 		}
 	}
-	// Update preview for in-progress form
-	m.updatePreview()
 	return m, tea.Batch(cmds...)
 }
 
+/*
 func (m *model) updatePreview() {
 	preview := "Current Request:\n\n"
 
-	preview += fmt.Sprintf("Method: %s\n", m.request_form.method)
-	preview += fmt.Sprintf("URL: %s\n", m.request_form.name)
-	preview += fmt.Sprintf("Body: %s\n", m.request_form.body)
-	preview += fmt.Sprintf("Send: %s\n", m.request_form.send)
+	preview += fmt.Sprintf("Method: %s\n", m.request_form.Method)
+	preview += fmt.Sprintf("URL: %s\n", m.request_form.Name)
+	preview += fmt.Sprintf("Body: %s\n", m.request_form.Body)
+	preview += fmt.Sprintf("Send: %t\n", m.request_form.Send)
 
 	m.preview = preview
 }
+*/
 
 func widthCalc(m_width int, padding int, v_width float64) int {
 	width := (float64(m_width) * v_width) - float64(padding)
@@ -209,8 +215,14 @@ func (m model) View() string {
 }
 
 func main() {
+
+	db := database.SqliteDB()
+
+	database.Migrations(db)
+	defer db.Close()
+
 	p := tea.NewProgram(
-		initialModel(),
+		initialModel(db),
 		tea.WithAltScreen(),
 	)
 
