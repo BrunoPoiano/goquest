@@ -30,7 +30,7 @@ func MakeRequest(request models.Requests, db *sql.DB) (string, error) {
 		requestMethod = http.MethodPut
 	}
 
-  request_params, err := url.ParseQuery(request.Params)
+	request_params, err := url.ParseQuery(request.Params)
 
 	if requestMethod == http.MethodGet {
 		fullURL := fmt.Sprintf("%s?%s", request.Route, request_params.Encode())
