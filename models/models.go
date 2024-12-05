@@ -1,12 +1,13 @@
 package models
 
+
 type Requests struct {
 	Id     int
 	Name   string
 	Method string
 	Route  string
 	Params string
-  //Params url.Values
+	//Params url.Values
 }
 
 type RequestForm struct {
@@ -15,5 +16,3 @@ type RequestForm struct {
 	Method string
 	Send   bool
 }
-
-

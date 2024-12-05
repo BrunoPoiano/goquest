@@ -65,8 +65,8 @@ func AddItemsToTable(db *sql.DB, item models.Requests) {
 
 	if quantity > "0" {
 
-		update_query := `UPDATE requests SET name=?, method=?, route=?, params=? WHERE name=?`
-		_, err := db.Exec(update_query, item.Name, item.Method, item.Route, params_encoded, item.Name)
+		update_query := `UPDATE requests SET name=?, method=?, route=?, params=? WHERE route=?`
+		_, err := db.Exec(update_query, item.Name, item.Method, item.Route, params_encoded, item.Route)
 		if err != nil {
 			//fmt.Println("Error updating item into table:", err)
 			return
