@@ -3,10 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"main/components"
 	"main/database"
 	"main/models"
 	"main/requests"
-	"net/url"
 	"os"
 	"strings"
 
@@ -20,31 +20,21 @@ type model struct {
 	form     *huh.Form
 	requests models.Requests
 	lg       *lipgloss.Renderer
-	preview  string
-	padding  int
-	width    int
-	height   int
-	sent     bool // Track if request was sent
-	db       *sql.DB
-	loading  bool
+
+	selected string
+
+	preview string
+	padding int
+	width   int
+	height  int
+	sent    bool // Track if request was sent
+	db      *sql.DB
+	loading bool
 
 	ready    bool
 	viewport viewport.Model
 }
 
-var (
-	titleStyle = func() lipgloss.Style {
-		b := lipgloss.RoundedBorder()
-		b.Right = "├"
-		return lipgloss.NewStyle().BorderStyle(b).Padding(0, 1)
-	}()
-
-	infoStyle = func() lipgloss.Style {
-		b := lipgloss.RoundedBorder()
-		b.Left = "┤"
-		return titleStyle.BorderStyle(b)
-	}()
-)
 const useHighPerformanceRenderer = false
 
 func initialModel(db *sql.DB) model {
@@ -54,66 +44,17 @@ func initialModel(db *sql.DB) model {
 		lg:       lipgloss.DefaultRenderer(),
 		sent:     false,
 		requests: models.Requests{Method: "GET"},
+		selected: "form",
 	}
 
-	m.form = createForm(&m.requests)
+	m.form = components.CreateForm(&m.requests)
 
 	return m
-}
-
-func createForm(rf *models.Requests) *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Key("method").
-				Title("Method").
-				Options(
-					huh.NewOption("GET", "GET"),
-					huh.NewOption("POST", "POST"),
-					huh.NewOption("PUT", "PUT"),
-					huh.NewOption("DELETE", "DELETE"),
-				).
-				Value(&rf.Method),
-			huh.NewInput().
-				Key("name").
-				Value(&rf.Name).
-				Title("name"),
-
-			huh.NewInput().
-				Key("route").
-				Title("URL").
-				Value(&rf.Route).
-				Validate(func(s string) error {
-					if s == "" {
-						return nil
-					}
-					if _, err := url.Parse(s); err != nil {
-						return fmt.Errorf("invalid URL")
-					}
-					return nil
-				}),
-			huh.NewText().
-				Key("params").
-				Value(&rf.Params).
-				Title("Body"),
-
-			huh.NewConfirm().
-				Key("send").
-				Title("Send Request?").
-				Affirmative("Send"),
-		),
-	).
-		WithWidth(45).
-		WithShowHelp(true).
-		WithShowErrors(true)
 }
 
 func (m model) Init() tea.Cmd {
 	return m.form.Init()
 }
-
-
-
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -139,6 +80,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
+
+		case "ctrl+w":
+			if m.selected == "form" {
+				m.selected = "preview"
+			} else {
+				m.selected = "form"
+			}
+
 		case "ctrl+c":
 			return m, tea.Quit
 
@@ -153,46 +102,54 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "esc":
+			m.selected = "form"
 			if m.sent {
 				// Reset the form
 				m.sent = false
-				m.form = createForm(&m.requests)
+				m.form = components.CreateForm(&m.requests)
 				return m, m.form.Init()
 			}
 		}
 	}
 
 	// Handle form updates
-	form, cmd := m.form.Update(msg)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
-	}
+	if m.selected == "form" {
+		form, cmd := m.form.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
-	if f, ok := form.(*huh.Form); ok {
-		m.form = f
-		request_form := models.Requests{}
-		request_form.Method = m.form.GetString("method")
-		request_form.Name = m.form.GetString("name")
-		request_form.Route = m.form.GetString("route")
-		request_form.Params = m.form.GetString("params")
-		m.requests = request_form
-		send := m.form.GetBool("send")
+		if f, ok := form.(*huh.Form); ok {
+			m.form = f
+			request_form := models.Requests{}
+			request_form.Method = m.form.GetString("method")
+			request_form.Name = m.form.GetString("name")
+			request_form.Route = m.form.GetString("route")
+			request_form.Params = m.form.GetString("params")
+			m.requests = request_form
+			send := m.form.GetBool("send")
 
-		if send == true {
-			requestReturn, err := requests.MakeRequest(request_form, m.db)
-			if err != nil {
-				m.preview = err.Error()
-			} else {
-        m.preview += "requestReturn"
-				m.preview += requestReturn
-				m.viewport.SetContent(requestReturn)
+			if send == true {
+				requestReturn, err := requests.MakeRequest(request_form, m.db)
+				if err != nil {
+					m.preview = err.Error()
+				} else {
+					m.preview += "requestReturn"
+					m.preview += requestReturn
+					m.viewport.SetContent(requestReturn)
+				}
+				m.selected = "preview"
+				m.sent = true
 			}
-			m.sent = true
 		}
 	}
 
-	m.viewport, cmd = m.viewport.Update(msg)
-	cmds = append(cmds, cmd)
+	if m.selected == "preview" {
+   var cmd tea.Cmd
+    m.viewport, cmd = m.viewport.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -203,13 +160,18 @@ func widthCalc(m_width int, padding int, v_width float64) int {
 
 func (m model) formView(v_width float64) string {
 	if m.sent {
+
+
+    content := fmt.Sprintf("%s: %s\nBody: %s\n\n",  m.requests.Method, m.requests.Route, m.requests.Params)
+    content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
+
 		width := widthCalc(m.width, m.padding, v_width)
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("1")).
 			Width(width).
 			Align(lipgloss.Center).
-			Render("Request sent!\n\nPress ESC to create a new reques\n\nPress Enter to Resend")
+			Render(content)
 	}
 
 	width := widthCalc(m.width, m.padding, v_width)
@@ -223,31 +185,24 @@ func (m model) formView(v_width float64) string {
 		Render(form)
 }
 
-func (m model) headerView() string {
-	title := titleStyle.Render("Preview")
-	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
-}
-
-func (m model) footerView() string {
-	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
-	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
-}
-
 func (m model) previewView(v_width float64) string {
 	width := widthCalc(m.width, m.padding, v_width)
 	m.viewport.Width = width - m.padding - 5
 
-	content := fmt.Sprintf("%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView())
+	content := fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
 
-
-	return lipgloss.NewStyle().
+  newStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("1")).
 		Padding(m.padding).
-		Width(width).
-		Render(content)
+		Width(width)
+
+  if m.selected == "preview" {
+    newStyle.BorderForeground(lipgloss.Color("1"))
+  }else{
+    newStyle.BorderForeground(lipgloss.Color("#FFF")) 
+  }
+
+  return newStyle.Render(content)
 }
 
 func (m model) View() string {
@@ -260,7 +215,6 @@ func (m model) View() string {
 		m.previewView(0.6),
 	)
 }
-
 
 func main() {
 
