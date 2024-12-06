@@ -145,8 +145,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.selected == "preview" {
-   var cmd tea.Cmd
-    m.viewport, cmd = m.viewport.Update(msg)
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -161,9 +161,8 @@ func widthCalc(m_width int, padding int, v_width float64) int {
 func (m model) formView(v_width float64) string {
 	if m.sent {
 
-
-    content := fmt.Sprintf("%s: %s\nBody: %s\n\n",  m.requests.Method, m.requests.Route, m.requests.Params)
-    content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
+		content := fmt.Sprintf("%s: %s\nBody: %s\n\n", m.requests.Method, m.requests.Route, m.requests.Params)
+		content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
 
 		width := widthCalc(m.width, m.padding, v_width)
 		return lipgloss.NewStyle().
@@ -178,9 +177,19 @@ func (m model) formView(v_width float64) string {
 
 	v := strings.TrimSuffix(m.form.View(), "\n\n")
 	form := m.lg.NewStyle().Margin(1, 0).Render(v)
+
+	if m.selected == "form" {
+
+		return lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("1")).
+			Width(width).
+			Render(form)
+	}
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("1")).
+		BorderForeground(lipgloss.Color("#FFF")).
 		Width(width).
 		Render(form)
 }
@@ -191,29 +200,38 @@ func (m model) previewView(v_width float64) string {
 
 	content := fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
 
-  newStyle := lipgloss.NewStyle().
+	if m.selected == "preview" {
+
+		return lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("1")).
+			Padding(m.padding).
+			Width(width).
+			Render(content)
+	}
+
+	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#FFF")).
 		Padding(m.padding).
-		Width(width)
-
-  if m.selected == "preview" {
-    newStyle.BorderForeground(lipgloss.Color("1"))
-  }else{
-    newStyle.BorderForeground(lipgloss.Color("#FFF")) 
-  }
-
-  return newStyle.Render(content)
+		Width(width).
+		Render(content)
 }
 
 func (m model) View() string {
 	if m.width == 0 {
 		return "Loading..."
 	}
-	return lipgloss.JoinHorizontal(
+
+	view := m.selected + " \n"
+
+	view += lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		m.formView(0.4),
 		m.previewView(0.6),
 	)
+
+	return view
 }
 
 func main() {
