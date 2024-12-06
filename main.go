@@ -8,8 +8,10 @@ import (
 	"main/models"
 	"main/requests"
 	"os"
+	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -17,22 +19,27 @@ import (
 )
 
 type model struct {
+	debug string
+
 	form     *huh.Form
+	sent     bool // Track if request was sent
 	requests models.Requests
 	lg       *lipgloss.Renderer
 
 	selected string
+	preview  string
+	loading  bool
 
-	preview string
 	padding int
 	width   int
 	height  int
-	sent    bool // Track if request was sent
-	db      *sql.DB
-	loading bool
+
+	db *sql.DB
 
 	ready    bool
 	viewport viewport.Model
+
+	table table.Model
 }
 
 const useHighPerformanceRenderer = false
@@ -47,17 +54,20 @@ func initialModel(db *sql.DB) model {
 		selected: "form",
 	}
 
+	m.table = components.Table(db)
 	m.form = components.CreateForm(&m.requests)
 
 	return m
 }
 
 func (m model) Init() tea.Cmd {
+
 	return m.form.Init()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 
@@ -82,25 +92,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 
 		case "ctrl+w":
-			if m.selected == "form" {
+
+			switch m.selected {
+			case "form":
 				m.selected = "preview"
-			} else {
+			case "preview":
+				m.selected = "table"
+			case "table":
 				m.selected = "form"
 			}
-
 		case "ctrl+c":
 			return m, tea.Quit
 
 		case "enter":
-			if m.sent {
-				requestReturn, err := requests.MakeRequest(m.requests, m.db)
-				if err != nil {
-					m.preview = err.Error()
-				} else {
-					m.preview = requestReturn
-					m.viewport.SetContent(requestReturn)
+
+			switch m.selected {
+			case "preview":
+			case "form":
+				if m.sent {
+					requestReturn, err := requests.MakeRequest(m.requests, m.db)
+					if err != nil {
+						m.preview = err.Error()
+					} else {
+						m.preview = requestReturn
+						m.viewport.SetContent(requestReturn)
+					}
 				}
+
+			case "table":
+				request_form := models.Requests{}
+				request_form.Name = m.table.SelectedRow()[1]
+				request_form.Method = m.table.SelectedRow()[2]
+				request_form.Route = m.table.SelectedRow()[3]
+				m.requests = request_form
+				m.form = components.CreateForm(&request_form)
+				m.sent = false
+				m.selected = "form"
 			}
+
 		case "esc":
 			m.selected = "form"
 			if m.sent {
@@ -112,8 +141,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle form updates
-	if m.selected == "form" {
+	switch m.selected {
+	case "form":
 		form, cmd := m.form.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -130,6 +159,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			send := m.form.GetBool("send")
 
 			if send == true {
+				m.loading = true
 				requestReturn, err := requests.MakeRequest(request_form, m.db)
 				if err != nil {
 					m.preview = err.Error()
@@ -140,14 +170,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.selected = "preview"
 				m.sent = true
+				m.loading = false
 			}
 		}
-	}
 
-	if m.selected == "preview" {
-		var cmd tea.Cmd
+	case "table":
+		m.table, cmd = m.table.Update(msg)
+		cmds = append(cmds, cmd)
+
+	case "preview":
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
+
 	}
 
 	return m, tea.Batch(cmds...)
@@ -194,14 +228,38 @@ func (m model) formView(v_width float64) string {
 		Render(form)
 }
 
+func (m model) tableView() string {
+
+	focused := m.table.Focused()
+
+	content := m.table.View() + "\n  " + m.table.HelpView() + "\n " + strconv.FormatBool(focused)
+	if m.selected == "table" {
+
+		return lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("1")).
+			Render(content)
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#FFF")).
+		Render(content)
+
+}
+
 func (m model) previewView(v_width float64) string {
 	width := widthCalc(m.width, m.padding, v_width)
 	m.viewport.Width = width - m.padding - 5
 
-	content := fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
+	content := ""
+	if m.loading {
+		content = "Loading ..."
+	} else {
+		content = fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
+	}
 
 	if m.selected == "preview" {
-
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("1")).
@@ -218,18 +276,58 @@ func (m model) previewView(v_width float64) string {
 		Render(content)
 }
 
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+func (m model) tabsView() string {
+
+	type MenuItem struct {
+		Name     string
+		Selected []string
+	}
+
+	menu := []MenuItem{
+		{Name: "Main", Selected: []string{"preview", "form"}},
+		{Name: "Table", Selected: []string{"table"}},
+	}
+
+	actions := "|"
+	for _, item := range menu {
+
+		menuItem := fmt.Sprintf(" %s ", item.Name)
+		if contains(item.Selected, m.selected) {
+			actions += lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("1")).Foreground(lipgloss.Color("#FFFFFF")).Render(menuItem)
+		} else {
+			actions += lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render(menuItem)
+		}
+
+		actions += "|"
+	}
+
+	return actions
+}
+
 func (m model) View() string {
 	if m.width == 0 {
 		return "Loading..."
 	}
 
-	view := m.selected + " \n"
-
-	view += lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		m.formView(0.4),
-		m.previewView(0.6),
-	)
+	view := m.tabsView() + " \n" + m.debug + " \n"
+	if m.selected == "table" {
+		view += "\n\n" + m.tableView()
+	} else {
+		view += lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			m.formView(0.4),
+			m.previewView(0.6),
+		)
+	}
 
 	return view
 }
