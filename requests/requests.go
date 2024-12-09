@@ -11,9 +11,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
-func MakeRequest(request models.Requests, db *sql.DB) (string, error) {
+func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 
 	requestMethod := http.MethodGet
 	var response *http.Request
@@ -41,16 +43,31 @@ func MakeRequest(request models.Requests, db *sql.DB) (string, error) {
 	}
 
 	if err != nil {
-		return "", err
+		return func() tea.Msg {
+			return models.ReturnRequest{
+				Response: "",
+				Error:    err,
+			}
+		}
 	}
 
 	controllers.AddItemsToTable(db, request)
 	prettyRes, err := responseParser(response)
 
 	if err != nil {
-		return "", err
+		return func() tea.Msg {
+			return models.ReturnRequest{
+				Response: "",
+				Error:    err,
+			}
+		}
 	}
-	return prettyRes, nil
+	return func() tea.Msg {
+		return models.ReturnRequest{
+			Response: prettyRes,
+			Error:    nil,
+		}
+	}
 
 }
 

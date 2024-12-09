@@ -8,15 +8,14 @@ import (
 )
 
 
-func DeleteItemFromTable(db *sql.DB, item models.Requests) error {
+func DeleteItemFromTable(db *sql.DB, item_id string) error {
 
-	_, err := db.Exec("DELETE FROM requests WHERE id=?", item.Id)
+	_, err := db.Exec("DELETE FROM requests WHERE id=?", item_id)
 
 	if err != nil {
 		return errors.New("Error deleting item from requests")
 	}
 
-	//fmt.Println("Successfully deleted item")
 	return nil
 }
 

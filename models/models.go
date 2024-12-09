@@ -1,5 +1,8 @@
 package models
 
+import (
+	"github.com/charmbracelet/bubbles/table"
+)
 
 type Requests struct {
 	Id     int
@@ -15,4 +18,14 @@ type RequestForm struct {
 	Body   string
 	Method string
 	Send   bool
+}
+
+type ReturnRequest struct {
+	Response string
+	Error    error
+}
+
+type ReturnTable struct {
+	Table table.Model
+	Error error
 }
