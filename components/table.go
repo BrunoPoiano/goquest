@@ -2,14 +2,17 @@ package components
 
 import (
 	"database/sql"
+	"fmt"
 	"main/controllers"
+	"main/models"
 	"strconv"
 
 	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-func Table(db *sql.DB) table.Model {
+func Table(db *sql.DB, width int , height int) tea.Cmd {
 
 	items := controllers.GetItemsFromTable(db)
 
@@ -19,18 +22,24 @@ func Table(db *sql.DB) table.Model {
 		rows = append(rows, table.Row{strconv.Itoa(v.Id), v.Name, v.Method, v.Route})
 	}
 
+  // 213
+
+	column_w := (width - 24) / 2
+
+	debug := fmt.Sprintf("%d", column_w)
+
 	columns := []table.Column{
-		{Title: "Id", Width: 4},
-		{Title: "Name", Width: 10},
+		{Title: debug, Width: 4},
+		{Title: "Name", Width: column_w},
 		{Title: "Method", Width: 10},
-		{Title: "URL", Width: 10},
+		{Title: "URL", Width: column_w},
 	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(7),
+		table.WithHeight(height - 15),
 	)
 
 	s := table.DefaultStyles()
@@ -45,5 +54,10 @@ func Table(db *sql.DB) table.Model {
 		Bold(false)
 	t.SetStyles(s)
 
-	return t
+	return func() tea.Msg {
+		return models.ReturnTable{
+			Table: t,
+			Error: nil,
+		}
+	}
 }

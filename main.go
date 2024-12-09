@@ -4,11 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"main/components"
+	"main/controllers"
 	"main/database"
 	"main/models"
 	"main/requests"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -54,7 +54,6 @@ func initialModel(db *sql.DB) model {
 		selected: "form",
 	}
 
-	m.table = components.Table(db)
 	m.form = components.CreateForm(&m.requests)
 
 	return m
@@ -71,6 +70,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 
+	case models.ReturnRequest:
+		if msg.Error != nil {
+			m.preview = msg.Error.Error()
+		} else {
+			m.preview = msg.Response
+			m.viewport.SetContent(msg.Response)
+		}
+		m.selected = "preview"
+		m.sent = true
+		m.loading = false
+
+	case models.ReturnTable:
+		m.table = msg.Table
+		m.selected = "table"
+		m.loading = false
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -84,6 +99,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		}
 
+		if m.selected == "table" {
+			cmd = components.Table(m.db, m.widthCalc(1), m.height)
+			cmds = append(cmds, cmd)
+		}
+
 		if useHighPerformanceRenderer {
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
@@ -91,13 +111,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 
-		case "ctrl+w":
 
+		case "D":
+			switch m.selected {
+			case "table":
+			  err := controllers.DeleteItemFromTable(m.db, m.table.SelectedRow()[0])
+        if err != nil {
+          m.preview = err.Error()
+        }else{
+          m.viewport.SetContent("Item Deleted Successifully")
+          m.selected = "preview"
+        }
+      }
+		case "ctrl+w":
 			switch m.selected {
 			case "form":
 				m.selected = "preview"
 			case "preview":
-				m.selected = "table"
+				m.loading = true
+				cmd = components.Table(m.db, m.widthCalc(1), m.height)
+				cmds = append(cmds, cmd)
 			case "table":
 				m.selected = "form"
 			}
@@ -110,13 +143,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "preview":
 			case "form":
 				if m.sent {
-					requestReturn, err := requests.MakeRequest(m.requests, m.db)
-					if err != nil {
-						m.preview = err.Error()
-					} else {
-						m.preview = requestReturn
-						m.viewport.SetContent(requestReturn)
-					}
+					m.loading = true
+					cmd = requests.MakeRequest(m.requests, m.db)
+					cmds = append(cmds, cmd)
 				}
 
 			case "table":
@@ -138,7 +167,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.form = components.CreateForm(&m.requests)
 				return m, m.form.Init()
 			}
+
 		}
+
 	}
 
 	switch m.selected {
@@ -160,17 +191,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if send == true {
 				m.loading = true
-				requestReturn, err := requests.MakeRequest(request_form, m.db)
-				if err != nil {
-					m.preview = err.Error()
-				} else {
-					m.preview += "requestReturn"
-					m.preview += requestReturn
-					m.viewport.SetContent(requestReturn)
-				}
-				m.selected = "preview"
-				m.sent = true
-				m.loading = false
+				cmd = requests.MakeRequest(request_form, m.db)
+				cmds = append(cmds, cmd)
 			}
 		}
 
@@ -181,24 +203,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "preview":
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
-
 	}
 
 	return m, tea.Batch(cmds...)
 }
 
-func widthCalc(m_width int, padding int, v_width float64) int {
-	width := (float64(m_width) * v_width) - float64(padding)
+func (m model) widthCalc(v_width float64) int {
+	width := (float64(m.width) * v_width) - float64(m.padding)
 	return int(width)
 }
 
 func (m model) formView(v_width float64) string {
+
+	width := m.widthCalc(v_width)
+
 	if m.sent {
 
 		content := fmt.Sprintf("%s: %s\nBody: %s\n\n", m.requests.Method, m.requests.Route, m.requests.Params)
 		content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
 
-		width := widthCalc(m.width, m.padding, v_width)
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("1")).
@@ -206,9 +229,6 @@ func (m model) formView(v_width float64) string {
 			Align(lipgloss.Center).
 			Render(content)
 	}
-
-	width := widthCalc(m.width, m.padding, v_width)
-
 	v := strings.TrimSuffix(m.form.View(), "\n\n")
 	form := m.lg.NewStyle().Margin(1, 0).Render(v)
 
@@ -230,9 +250,13 @@ func (m model) formView(v_width float64) string {
 
 func (m model) tableView() string {
 
-	focused := m.table.Focused()
+	content := ""
 
-	content := m.table.View() + "\n  " + m.table.HelpView() + "\n " + strconv.FormatBool(focused)
+	if m.loading {
+		content = "Loading ... "
+	} else {
+		content = fmt.Sprintf("%s \n %s D to delete row ", m.table.View(), m.table.HelpView())
+	}
 	if m.selected == "table" {
 
 		return lipgloss.NewStyle().
@@ -249,7 +273,7 @@ func (m model) tableView() string {
 }
 
 func (m model) previewView(v_width float64) string {
-	width := widthCalc(m.width, m.padding, v_width)
+	width := m.widthCalc(v_width)
 	m.viewport.Width = width - m.padding - 5
 
 	content := ""
@@ -318,9 +342,11 @@ func (m model) View() string {
 		return "Loading..."
 	}
 
-	view := m.tabsView() + " \n" + m.debug + " \n"
+	view := fmt.Sprintf("Loading %t \n Debug %s \n width %d \n\n", m.loading, m.debug, m.width)
+
+	view += m.tabsView() + "\n\n"
 	if m.selected == "table" {
-		view += "\n\n" + m.tableView()
+		view += m.tableView()
 	} else {
 		view += lipgloss.JoinHorizontal(
 			lipgloss.Left,
