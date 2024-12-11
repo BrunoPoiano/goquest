@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"main/components"
 	"main/controllers"
@@ -9,6 +10,7 @@ import (
 	"main/models"
 	"main/requests"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -111,18 +113,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 
-
 		case "D":
 			switch m.selected {
 			case "table":
-			  err := controllers.DeleteItemFromTable(m.db, m.table.SelectedRow()[0])
-        if err != nil {
-          m.preview = err.Error()
-        }else{
-          m.viewport.SetContent("Item Deleted Successifully")
-          m.selected = "preview"
-        }
-      }
+				err := controllers.DeleteItemFromTable(m.db, m.table.SelectedRow()[0])
+				if err != nil {
+					m.preview = err.Error()
+				} else {
+					m.viewport.SetContent("Item Deleted Successifully")
+					m.selected = "preview"
+				}
+			}
 		case "ctrl+w":
 			switch m.selected {
 			case "form":
@@ -134,14 +135,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "table":
 				m.selected = "form"
 			}
+
+		case "ctrl+n":
+			switch m.selected {
+			case "form", "preview":
+				m.debug = "ctrl+n pressed"
+				empty_form := models.Requests{}
+				m.requests = empty_form
+				m.form = components.CreateForm(&empty_form)
+				m.selected = "form"
+				m.sent = false
+
+			}
+
 		case "ctrl+c":
 			return m, tea.Quit
 
 		case "enter":
 
 			switch m.selected {
-			case "preview":
-			case "form":
+			case "preview", "form":
 				if m.sent {
 					m.loading = true
 					cmd = requests.MakeRequest(m.requests, m.db)
@@ -150,11 +163,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "table":
 				request_form := models.Requests{}
+				request_form.Id, _ = strconv.Atoi(m.table.SelectedRow()[0])
 				request_form.Name = m.table.SelectedRow()[1]
 				request_form.Method = m.table.SelectedRow()[2]
 				request_form.Route = m.table.SelectedRow()[3]
 				request_form.Params = m.table.SelectedRow()[4]
-				request_form.Headers = fmt.Sprintf("%d", len(m.table.SelectedRow()[5]))
+				request_form.Headers = m.table.SelectedRow()[5]
 				m.requests = request_form
 				m.form = components.CreateForm(&request_form)
 				m.sent = false
@@ -184,12 +198,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if f, ok := form.(*huh.Form); ok {
 			m.form = f
 			request_form := models.Requests{}
-			request_form.Method = m.form.GetString("method")
-			request_form.Name = m.form.GetString("name")
-			request_form.Route = m.form.GetString("route")
-			request_form.Params = m.form.GetString("params")
-			request_form.Headers = m.form.GetString("headers")
-			m.requests = request_form
+			if m.requests.Id != 0 {
+				request_form = m.requests
+			} else {
+				request_form.Method = m.form.GetString("method")
+				request_form.Name = m.form.GetString("name")
+				request_form.Route = m.form.GetString("route")
+				request_form.Params = m.form.GetString("params")
+				request_form.Headers = m.form.GetString("headers")
+				m.requests = request_form
+			}
 			send := m.form.GetBool("send")
 
 			if send == true {
@@ -367,6 +385,25 @@ func main() {
 
 	database.Migrations(db)
 	defer db.Close()
+
+	curl := flag.String("curl", "", "")
+	flag.Parse()
+
+	// Check if flag was provided
+	curlProvided := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "curl" {
+			curlProvided = true
+		}
+	})
+
+	fmt.Println("curl Provided: ", curlProvided)
+
+	if curlProvided {
+		if *curl != "" {
+			components.CurlBreaker(*curl, db)
+		}
+	}
 
 	p := tea.NewProgram(
 		initialModel(db),

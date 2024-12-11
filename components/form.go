@@ -11,6 +11,7 @@ import (
 func CreateForm(rf *models.Requests) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
+
 			huh.NewSelect[string]().
 				Key("method").
 				Title("Method").
@@ -39,12 +40,12 @@ func CreateForm(rf *models.Requests) *huh.Form {
 					}
 					return nil
 				}),
-				huh.NewText().
+			huh.NewText().
 				Key("headers").
 				Value(&rf.Headers).
 				Title("Headers"),
 
-		huh.NewText().
+			huh.NewText().
 				Key("params").
 				Value(&rf.Params).
 				Title("Body"),
@@ -55,9 +56,6 @@ func CreateForm(rf *models.Requests) *huh.Form {
 				Affirmative("Send"),
 		),
 	).
-		WithWidth(45).
 		WithShowHelp(true).
 		WithShowErrors(true)
 }
-
-

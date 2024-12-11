@@ -42,13 +42,13 @@ func GetItemsFromTable(db *sql.DB) []models.Requests {
 	return items
 }
 
-func AddItemsToTable(db *sql.DB, item models.Requests) {
+func AddItemsToTable(db *sql.DB, item models.Requests) error {
 
 	var quantity string
 	quantity_query := db.QueryRow("SELECT count(id) as quantity FROM requests WHERE name = ?", item.Name).Scan(&quantity)
 
 	if quantity_query != nil && quantity_query != sql.ErrNoRows {
-		return
+		return errors.New("Error runing quantity check")
 	}
 
 	params_encoded := item.Params
@@ -58,15 +58,17 @@ func AddItemsToTable(db *sql.DB, item models.Requests) {
 		update_query := `UPDATE requests SET name=?, method=?, route=?, params=?, headers=? WHERE route=?`
 		_, err := db.Exec(update_query, item.Name, item.Method, item.Route, params_encoded, item.Headers, item.Route)
 		if err != nil {
-			return
+			return errors.New("Error updating Table")
 		}
 
-		return
+		return nil
 	}
 
 	insert_query := `INSERT INTO requests (name, method, route, params, headers) VALUES (?, ?, ?, ?,?)`
 	_, err := db.Exec(insert_query, item.Name, item.Method, item.Route, params_encoded, item.Headers)
 	if err != nil {
-		return
+		return errors.New("Error inserting item in table")
 	}
+
+  return nil
 }
