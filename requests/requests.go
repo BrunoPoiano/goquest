@@ -32,15 +32,43 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 		requestMethod = http.MethodPut
 	}
 
-	request_params, err := url.ParseQuery(request.Params)
+	params := strings.ReplaceAll(request.Params, ";", "&")
+	params = strings.ReplaceAll(params, " ", "")
+	params = strings.ReplaceAll(params, "\n", "")
+
+	request_params, err := url.ParseQuery(params)
 
 	if requestMethod == http.MethodGet {
 		fullURL := fmt.Sprintf("%s?%s", request.Route, request_params.Encode())
 		response, err = http.NewRequest(requestMethod, fullURL, nil)
 	} else {
 		response, err = http.NewRequest(requestMethod, request.Route, strings.NewReader(request_params.Encode()))
-		response.Header.Set("Content-Type", "application/x-www-form-urlencoded") // For form data
 	}
+
+	response.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if len(request.Headers) > 0 {
+		headersSplit := strings.Split(request.Headers, ";")
+
+		for _, values := range headersSplit {
+			item := strings.Split(values, "=")
+			if item[1] != "" {
+				name := strings.ReplaceAll(item[0], " ", "")
+				value := strings.ReplaceAll(item[1], " ", "")
+				response.Header.Set(name, value)
+			}
+		}
+	}
+
+	/*
+		    //Check Headers
+				return func() tea.Msg {
+					return models.ReturnRequest{
+						Response: formatHeaders(response.Header),
+						Error:    err,
+					}
+				}
+	*/
 
 	if err != nil {
 		return func() tea.Msg {
@@ -57,11 +85,12 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 	if err != nil {
 		return func() tea.Msg {
 			return models.ReturnRequest{
-				Response: "",
+				Response: "Error getting response",
 				Error:    err,
 			}
 		}
 	}
+
 	return func() tea.Msg {
 		return models.ReturnRequest{
 			Response: prettyRes,
@@ -72,6 +101,7 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 }
 
 func responseParser(response *http.Request) (string, error) {
+
 	res, err := http.DefaultClient.Do(response)
 	if err != nil {
 		return "error making http request:", err
@@ -82,11 +112,16 @@ func responseParser(response *http.Request) (string, error) {
 		return "error reading response body", err
 	}
 
-	prettyRes, err := prettyString(string(resBody))
-	if err != nil {
-		return "error formating Json", err
+	if res.StatusCode == 200 {
+
+		prettyRes, err := prettyString(string(resBody))
+		if err != nil {
+			return "error formating Json", err
+		}
+		return prettyRes, nil
 	}
-	return prettyRes, nil
+
+	return string(resBody), nil
 }
 
 func prettyString(str string) (string, error) {
@@ -95,4 +130,14 @@ func prettyString(str string) (string, error) {
 		return "error prettyString func", err
 	}
 	return prettyJSON.String(), nil
+}
+
+func formatHeaders(headers http.Header) string {
+	var headerStr string
+	for key, values := range headers {
+		for _, value := range values {
+			headerStr += fmt.Sprintf("%s: %s\n", key, value)
+		}
+	}
+	return headerStr
 }

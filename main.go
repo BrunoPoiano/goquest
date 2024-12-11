@@ -72,7 +72,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case models.ReturnRequest:
 		if msg.Error != nil {
-			m.preview = msg.Error.Error()
+			m.preview = msg.Response
 		} else {
 			m.preview = msg.Response
 			m.viewport.SetContent(msg.Response)
@@ -153,6 +153,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Name = m.table.SelectedRow()[1]
 				request_form.Method = m.table.SelectedRow()[2]
 				request_form.Route = m.table.SelectedRow()[3]
+				request_form.Params = m.table.SelectedRow()[4]
+				request_form.Headers = fmt.Sprintf("%d", len(m.table.SelectedRow()[5]))
 				m.requests = request_form
 				m.form = components.CreateForm(&request_form)
 				m.sent = false
@@ -186,6 +188,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			request_form.Name = m.form.GetString("name")
 			request_form.Route = m.form.GetString("route")
 			request_form.Params = m.form.GetString("params")
+			request_form.Headers = m.form.GetString("headers")
 			m.requests = request_form
 			send := m.form.GetBool("send")
 
