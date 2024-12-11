@@ -2,7 +2,6 @@ package components
 
 import (
 	"database/sql"
-	"fmt"
 	"main/controllers"
 	"main/models"
 	"strconv"
@@ -12,34 +11,31 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func Table(db *sql.DB, width int , height int) tea.Cmd {
+func Table(db *sql.DB, width int, height int) tea.Cmd {
 
 	items := controllers.GetItemsFromTable(db)
 
 	var rows []table.Row
 
 	for _, v := range items {
-		rows = append(rows, table.Row{strconv.Itoa(v.Id), v.Name, v.Method, v.Route})
+		rows = append(rows, table.Row{strconv.Itoa(v.Id), v.Name, v.Method, v.Route, v.Params, v.Headers})
 	}
-
-  // 213
-
-	column_w := (width - 24) / 2
-
-	debug := fmt.Sprintf("%d", column_w)
+	column_w := (width - 24) / 4
 
 	columns := []table.Column{
-		{Title: debug, Width: 4},
+		{Title: "Id", Width: 4},
 		{Title: "Name", Width: column_w},
 		{Title: "Method", Width: 10},
 		{Title: "URL", Width: column_w},
+		{Title: "Params", Width: column_w},
+		{Title: "Headers", Width: column_w},
 	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(height - 15),
+		table.WithHeight(height-15),
 	)
 
 	s := table.DefaultStyles()

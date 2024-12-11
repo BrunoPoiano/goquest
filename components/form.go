@@ -39,7 +39,12 @@ func CreateForm(rf *models.Requests) *huh.Form {
 					}
 					return nil
 				}),
-			huh.NewText().
+				huh.NewText().
+				Key("headers").
+				Value(&rf.Headers).
+				Title("Headers"),
+
+		huh.NewText().
 				Key("params").
 				Value(&rf.Params).
 				Title("Body"),

@@ -20,7 +20,7 @@ func SqliteDB() *sql.DB {
 func Migrations(db *sql.DB) {
 
 	fmt.Println("preparing to create table")
-	statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS requests (id INTEGER PRIMARY KEY, name VARCHAR(64), method VARCHAR(64), route VARCHAR(64), params VARCHAR(64) NULL)")
+	statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS requests (id INTEGER PRIMARY KEY, name VARCHAR(64), method VARCHAR(64), route VARCHAR(64), params VARCHAR(64) NULL, headers VARCHAR(64) NULL)")
 	if err != nil {
 		fmt.Println("Error preparing the table creation statement:", err)
 		return

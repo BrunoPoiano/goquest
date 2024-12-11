@@ -5,19 +5,18 @@ import (
 )
 
 type Requests struct {
-	Id     int
-	Name   string
-	Method string
-	Route  string
-	Params string
+	Id      int
+	Name    string
+	Method  string
+	Route   string
+	Params  string
+	Headers string
 	//Params url.Values
 }
 
-type RequestForm struct {
-	Name   string
-	Body   string
-	Method string
-	Send   bool
+type HeadersForm struct {
+	Header string
+	value  string
 }
 
 type ReturnRequest struct {
