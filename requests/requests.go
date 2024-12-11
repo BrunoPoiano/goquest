@@ -17,6 +17,26 @@ import (
 
 func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 
+/*
+	if strconv.Itoa(request.Id) != "0"{
+		return func() tea.Msg {
+			return models.ReturnRequest{
+				Response: "TEM ID " + request.Headers,
+				Error:    nil,
+			}
+		}
+  }else{
+		return func() tea.Msg {
+			return models.ReturnRequest{
+				Response: " sem id" +strconv.Itoa(request.Id),
+
+				Error:    nil,
+			}
+		}
+
+  }
+*/
+
 	requestMethod := http.MethodGet
 	var response *http.Request
 	var err error
@@ -48,11 +68,11 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 	response.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	if len(request.Headers) > 0 {
-		headersSplit := strings.Split(request.Headers, ";")
+		headersSplit := strings.Split(request.Headers, "|")
 
 		for _, values := range headersSplit {
 			item := strings.Split(values, "=")
-			if item[1] != "" {
+			if len(item) > 1 && item[0]!= "" {
 				name := strings.ReplaceAll(item[0], " ", "")
 				value := strings.ReplaceAll(item[1], " ", "")
 				response.Header.Set(name, value)
