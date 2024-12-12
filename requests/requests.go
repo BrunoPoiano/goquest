@@ -17,25 +17,25 @@ import (
 
 func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 
-/*
-	if strconv.Itoa(request.Id) != "0"{
-		return func() tea.Msg {
-			return models.ReturnRequest{
-				Response: "TEM ID " + request.Headers,
-				Error:    nil,
-			}
-		}
-  }else{
-		return func() tea.Msg {
-			return models.ReturnRequest{
-				Response: " sem id" +strconv.Itoa(request.Id),
+	/*
+	   	if strconv.Itoa(request.Id) != "0"{
+	   		return func() tea.Msg {
+	   			return models.ReturnRequest{
+	   				Response: "TEM ID " + request.Headers,
+	   				Error:    nil,
+	   			}
+	   		}
+	     }else{
+	   		return func() tea.Msg {
+	   			return models.ReturnRequest{
+	   				Response: " sem id" +strconv.Itoa(request.Id),
 
-				Error:    nil,
-			}
-		}
+	   				Error:    nil,
+	   			}
+	   		}
 
-  }
-*/
+	     }
+	*/
 
 	requestMethod := http.MethodGet
 	var response *http.Request
@@ -71,10 +71,10 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 		headersSplit := strings.Split(request.Headers, "|")
 
 		for _, values := range headersSplit {
-			item := strings.Split(values, "=")
-			if len(item) > 1 && item[0]!= "" {
-				name := strings.ReplaceAll(item[0], " ", "")
-				value := strings.ReplaceAll(item[1], " ", "")
+			item := strings.SplitN(values, "=", 2)
+			if len(item) > 1 && item[0] != "" {
+				name := strings.Trim(item[0], " ")
+				value := strings.Trim(item[1], " ")
 				response.Header.Set(name, value)
 			}
 		}
@@ -82,6 +82,7 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 
 	/*
 		    //Check Headers
+
 				return func() tea.Msg {
 					return models.ReturnRequest{
 						Response: formatHeaders(response.Header),
@@ -93,7 +94,7 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 	if err != nil {
 		return func() tea.Msg {
 			return models.ReturnRequest{
-				Response: "",
+				Response: "Error ",
 				Error:    err,
 			}
 		}
@@ -101,7 +102,6 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 
 	controllers.AddItemsToTable(db, request)
 	prettyRes, err := responseParser(response)
-
 	if err != nil {
 		return func() tea.Msg {
 			return models.ReturnRequest{
@@ -141,7 +141,7 @@ func responseParser(response *http.Request) (string, error) {
 		return prettyRes, nil
 	}
 
-	return string(resBody), nil
+	return "500", nil
 }
 
 func prettyString(str string) (string, error) {

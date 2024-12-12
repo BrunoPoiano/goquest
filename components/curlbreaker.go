@@ -14,9 +14,11 @@ func CurlBreaker(curl string, db *sql.DB) (error) {
 
 	var item models.Requests
 	var headers string
+  item.Name = "curl added"
+  item.Method = "GET"
 
 	for i, v := range splited {
-		value := strings.ReplaceAll(v, `'`, "")
+		value := strings.ReplaceAll(v, "'", "")
 
 		if i == 0 {
 			route := strings.ReplaceAll(value, "curl", "")
@@ -36,13 +38,12 @@ func CurlBreaker(curl string, db *sql.DB) (error) {
 				item.Params = strings.ReplaceAll(routeSplit[1], "&", ";")
 			}
 		} else {
-			header := strings.ReplaceAll(value, ":", "=")
+			header := strings.Replace(value, ":", "=", 1)
 			headers += header + "|"
 		}
 	}
 
 	item.Headers = headers
-	item.Name = "curl added"
 
   err := controllers.AddItemsToTable(db, item)
   if err != nil {
