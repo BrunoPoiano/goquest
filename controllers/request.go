@@ -45,7 +45,7 @@ func GetItemsFromTable(db *sql.DB) []models.Requests {
 func AddItemsToTable(db *sql.DB, item models.Requests) error {
 
 	var quantity string
-	quantity_query := db.QueryRow("SELECT count(id) as quantity FROM requests WHERE name = ?", item.Name).Scan(&quantity)
+	quantity_query := db.QueryRow("SELECT count(id) as quantity FROM requests WHERE route = ?", item.Route).Scan(&quantity)
 
 	if quantity_query != nil && quantity_query != sql.ErrNoRows {
 		return errors.New("Error runing quantity check")

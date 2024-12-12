@@ -75,7 +75,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case models.ReturnRequest:
 		if msg.Error != nil {
 			m.preview = msg.Response
-		} else {
+			m.viewport.SetContent(msg.Error.Error())
+    } else {
 			m.preview = msg.Response
 			m.viewport.SetContent(msg.Response)
 		}
@@ -209,7 +210,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.requests = request_form
 			}
 			send := m.form.GetBool("send")
-
+      //m.viewport.SetContent(m.checkForm(request_form))
+      
 			if send == true {
 				m.loading = true
 				cmd = requests.MakeRequest(request_form, m.db)
@@ -229,6 +231,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m model) checkForm (request_form models.Requests) models.Requests{
+  checked_form := models.Requests{}
+
+  if(request_form.Id == 0) {
+    return m.requests
+  }
+
+  checked_form.Name = fmt.Sprintln("%d %d", len(m.requests.Name), len(request_form.Name))
+
+ 
+  return checked_form
+
+}
+
 func (m model) widthCalc(v_width float64) int {
 	width := (float64(m.width) * v_width) - float64(m.padding)
 	return int(width)
@@ -238,7 +254,7 @@ func (m model) formView(v_width float64) string {
 
 	width := m.widthCalc(v_width)
 
-	if m.sent {
+if m.sent {
 
 		content := fmt.Sprintf("%s: %s\nBody: %s\n\n", m.requests.Method, m.requests.Route, m.requests.Params)
 		content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
