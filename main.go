@@ -383,7 +383,8 @@ func (m model) View() string {
 		return "Loading..."
 	}
 
-	view := fmt.Sprintf("Loading %t \n Debug %s \n width %d \n\n", m.loading, m.debug, m.width)
+  view := ""
+	//view = fmt.Sprintf("Loading %t \n Debug %s \n width %d \n\n", m.loading, m.debug, m.width)
 
 	view += m.tabsView() + "\n\n"
 	if m.selected == "table" {
