@@ -43,10 +43,12 @@ func CreateForm(rf *models.Requests) *huh.Form {
 			huh.NewText().
 				Key("headers").
 				Value(&rf.Headers).
-				Title("Headers"),
+				CharLimit(400).
+        Title("Headers"),
 
 			huh.NewText().
 				Key("params").
+				CharLimit(400).
 				Value(&rf.Params).
 				Title("Body"),
 

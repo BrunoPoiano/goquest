@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-func CurlBreaker(curl string, db *sql.DB) (error) {
+func CurlBreaker(curl string, db *sql.DB) (models.Requests, error) {
 
 	splited := strings.Split(curl, "-H")
 
 	var item models.Requests
 	var headers string
-  item.Name = "curl added"
-  item.Method = "GET"
+	item.Name = "curl added"
+	item.Method = "GET"
 
 	for i, v := range splited {
 		value := strings.ReplaceAll(v, "'", "")
@@ -35,22 +35,37 @@ func CurlBreaker(curl string, db *sql.DB) (error) {
 				}
 			}
 			if len(routeSplit) > 1 && routeSplit[1] != "" {
-				item.Params = strings.ReplaceAll(routeSplit[1], "&", ";")
+				item.Params = routeSplit[1]
 			}
 		} else {
-			header := strings.Replace(value, ":", "=", 1)
+			header := ""
+			if strings.Contains(value, "--data-raw") {
+				valueSplit := strings.Split(value, "--data-raw")
+				header = valueSplit[0]
+				item.Params = strings.TrimSpace(valueSplit[1])
+			} else {
+				header = value
+			}
+
+			header = strings.Replace(header, ":", "=", 1)
 			headers += header + "|"
+
 		}
 	}
 
 	item.Headers = headers
 
-  err := controllers.AddItemsToTable(db, item)
-  if err != nil {
-    fmt.Println("Error: ", err.Error())
-    return err
+	err := controllers.AddItemsToTable(db, item)
+	if err != nil {
+		fmt.Println("Error: ", err.Error())
+		return models.Requests{}, err
+	}
 
-  }
-  
-return nil
+	saved_item, err := controllers.GetItemFromTable(db, item.Method, item.Route)
+	if err != nil {
+		fmt.Println("Error: ", err.Error())
+		return models.Requests{}, err
+	}
+
+	return saved_item, nil
 }

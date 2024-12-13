@@ -9,7 +9,6 @@ import (
 	"main/controllers"
 	"main/models"
 	"net/http"
-	"net/url"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -52,17 +51,14 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 		requestMethod = http.MethodPut
 	}
 
-	params := strings.ReplaceAll(request.Params, ";", "&")
-	params = strings.ReplaceAll(params, " ", "")
-	params = strings.ReplaceAll(params, "\n", "")
+	switch requestMethod {
 
-	request_params, err := url.ParseQuery(params)
-
-	if requestMethod == http.MethodGet {
-		fullURL := fmt.Sprintf("%s?%s", request.Route, request_params.Encode())
+	case http.MethodGet:
+		fullURL := fmt.Sprintf("%s?%s", request.Route, request.Params)
 		response, err = http.NewRequest(requestMethod, fullURL, nil)
-	} else {
-		response, err = http.NewRequest(requestMethod, request.Route, strings.NewReader(request_params.Encode()))
+
+	default:
+		response, err = http.NewRequest(requestMethod, request.Route, bytes.NewBuffer([]byte(request.Params)))
 	}
 
 	response.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -73,8 +69,8 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 		for _, values := range headersSplit {
 			item := strings.SplitN(values, "=", 2)
 			if len(item) > 1 && item[0] != "" {
-				name := strings.Trim(item[0], " ")
-				value := strings.Trim(item[1], " ")
+				name := strings.TrimSpace(item[0])
+				value := strings.TrimSpace(item[1])
 				response.Header.Set(name, value)
 			}
 		}
@@ -132,16 +128,13 @@ func responseParser(response *http.Request) (string, error) {
 		return "error reading response body", err
 	}
 
-	if res.StatusCode == 200 {
-
-		prettyRes, err := prettyString(string(resBody))
-		if err != nil {
-			return "error formating Json", err
-		}
-		return prettyRes, nil
+	prettyRes, err := prettyString(string(resBody))
+	if err != nil {
+		return "error formating Json", err
 	}
 
-	return "500", nil
+	return prettyRes, nil
+
 }
 
 func prettyString(str string) (string, error) {
