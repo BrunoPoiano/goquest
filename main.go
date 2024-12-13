@@ -46,13 +46,13 @@ type model struct {
 
 const useHighPerformanceRenderer = false
 
-func initialModel(db *sql.DB) model {
+func initialModel(db *sql.DB, item models.Requests) model {
 	m := model{
 		padding:  2,
 		db:       db,
 		lg:       lipgloss.DefaultRenderer(),
 		sent:     false,
-		requests: models.Requests{Method: "GET"},
+		requests: item,
 		selected: "form",
 	}
 
@@ -76,7 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Error != nil {
 			m.preview = msg.Response
 			m.viewport.SetContent(msg.Error.Error())
-    } else {
+		} else {
 			m.preview = msg.Response
 			m.viewport.SetContent(msg.Response)
 		}
@@ -199,22 +199,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if f, ok := form.(*huh.Form); ok {
 			m.form = f
 			request_form := models.Requests{}
-			if m.requests.Id != 0 {
-				request_form = m.requests
-			} else {
-				request_form.Method = m.form.GetString("method")
-				request_form.Name = m.form.GetString("name")
-				request_form.Route = m.form.GetString("route")
-				request_form.Params = m.form.GetString("params")
-				request_form.Headers = m.form.GetString("headers")
-				m.requests = request_form
-			}
+			request_form.Method = m.form.GetString("method")
+			request_form.Name = m.form.GetString("name")
+			request_form.Route = m.form.GetString("route")
+			request_form.Params = m.form.GetString("params")
+			request_form.Headers = m.form.GetString("headers")
 			send := m.form.GetBool("send")
-      //m.viewport.SetContent(m.checkForm(request_form))
-      
+
 			if send == true {
 				m.loading = true
-				cmd = requests.MakeRequest(request_form, m.db)
+				cmd = requests.MakeRequest(m.checkForm(request_form), m.db)
 				cmds = append(cmds, cmd)
 			}
 		}
@@ -231,17 +225,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) checkForm (request_form models.Requests) models.Requests{
-  checked_form := models.Requests{}
+func (m model) checkForm(request_form models.Requests) models.Requests {
 
-  if(request_form.Id == 0) {
-    return m.requests
-  }
+	if m.requests.Id == 0 {
+		return request_form
+	}
 
-  checked_form.Name = fmt.Sprintln("%d %d", len(m.requests.Name), len(request_form.Name))
+	checked_form := m.requests
+	checked_form.Name = request_form.Name
+	checked_form.Route = request_form.Route
 
- 
-  return checked_form
+	if len(request_form.Params) < 400 {
+		checked_form.Params = request_form.Params
+	}
+
+	/*
+		if len(request_form.Headers) < 400 {
+			checked_form.Headers = request_form.Headers
+		}
+	*/
+
+	return checked_form
 
 }
 
@@ -254,7 +258,7 @@ func (m model) formView(v_width float64) string {
 
 	width := m.widthCalc(v_width)
 
-if m.sent {
+	if m.sent {
 
 		content := fmt.Sprintf("%s: %s\nBody: %s\n\n", m.requests.Method, m.requests.Route, m.requests.Params)
 		content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
@@ -397,6 +401,7 @@ func (m model) View() string {
 
 func main() {
 
+	item_request := models.Requests{Method: "GET"}
 	db := database.SqliteDB()
 
 	database.Migrations(db)
@@ -413,16 +418,21 @@ func main() {
 		}
 	})
 
-	fmt.Println("curl Provided: ", curlProvided)
 
 	if curlProvided {
 		if *curl != "" {
-			components.CurlBreaker(*curl, db)
-		}
+			item, err := components.CurlBreaker(*curl, db)
+			if err != nil {
+				fmt.Printf("Error: %v", err)
+				os.Exit(1)
+			}
+			item_request = item
+	    fmt.Println("item_request ")
+    }
 	}
 
 	p := tea.NewProgram(
-		initialModel(db),
+		initialModel(db, item_request),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
