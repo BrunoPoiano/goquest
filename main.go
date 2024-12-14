@@ -81,7 +81,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(msg.Response)
 		}
 		m.selected = "preview"
-		m.sent = true
 		m.loading = false
 
 	case models.ReturnTable:
@@ -94,11 +93,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		if !m.ready {
 
-			m.viewport = viewport.New(msg.Width, msg.Height-30)
+			m.viewport = viewport.New(msg.Width, msg.Height-15)
 			m.viewport.YPosition = m.height
 			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
 			m.viewport.SetContent(m.preview)
-			m.ready = true
+      m.viewport.GotoTop()
+      m.ready = true
 
 		}
 
@@ -140,7 +140,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+n":
 			switch m.selected {
 			case "form", "preview":
-				m.debug = "ctrl+n pressed"
 				empty_form := models.Requests{}
 				m.requests = empty_form
 				m.form = components.CreateForm(&empty_form)
@@ -178,12 +177,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "esc":
 			m.selected = "form"
-			if m.sent {
-				// Reset the form
-				m.sent = false
-				m.form = components.CreateForm(&m.requests)
-				return m, m.form.Init()
-			}
+			m.sent = false
+			m.form = components.CreateForm(&m.requests)
+			return m, m.form.Init()
 
 		}
 
@@ -257,21 +253,8 @@ func (m model) widthCalc(v_width float64) int {
 func (m model) formView(v_width float64) string {
 
 	width := m.widthCalc(v_width)
-
-	if m.sent {
-
-		content := fmt.Sprintf("%s: %s\nBody: %s\n\n", m.requests.Method, m.requests.Route, m.requests.Params)
-		content += "Request sent!\n\nPress ESC to create a new request\n\nPress Enter to Resend "
-
-		return lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("1")).
-			Width(width).
-			Align(lipgloss.Center).
-			Render(content)
-	}
 	v := strings.TrimSuffix(m.form.View(), "\n\n")
-	form := m.lg.NewStyle().Margin(1, 0).Render(v)
+	form := m.lg.NewStyle().Margin(1, 0).Render(v + " ⸱ esc return to form ⸱ crtl+n to new form")
 
 	if m.selected == "form" {
 
@@ -383,8 +366,8 @@ func (m model) View() string {
 		return "Loading..."
 	}
 
-  view := ""
-	//view = fmt.Sprintf("Loading %t \n Debug %s \n width %d \n\n", m.loading, m.debug, m.width)
+	view := "\n"
+	//view = fmt.Sprintf("selected %s \n Debug %s \n width %d \n\n", m.selected, m.debug, m.width)
 
 	view += m.tabsView() + "\n\n"
 	if m.selected == "table" {
@@ -419,7 +402,6 @@ func main() {
 		}
 	})
 
-
 	if curlProvided {
 		if *curl != "" {
 			item, err := components.CurlBreaker(*curl, db)
@@ -428,8 +410,8 @@ func main() {
 				os.Exit(1)
 			}
 			item_request = item
-	    fmt.Println("item_request ")
-    }
+			fmt.Println("item_request ")
+		}
 	}
 
 	p := tea.NewProgram(
