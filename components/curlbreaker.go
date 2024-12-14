@@ -3,8 +3,8 @@ package components
 import (
 	"database/sql"
 	"fmt"
-	"main/controllers"
-	"main/models"
+	"goquest/controllers"
+	"goquest/models"
 	"strings"
 )
 

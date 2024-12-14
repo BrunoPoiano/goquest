@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"main/controllers"
-	"main/models"
+	"goquest/controllers"
+	"goquest/models"
 	"net/http"
 	"strings"
 
