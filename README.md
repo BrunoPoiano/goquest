@@ -18,4 +18,4 @@ All the requests send is stored on a database to facilitate tests
 ## Add Curl
 
 You can import a curl and it's automatically store on the database
-![App Screenshot](./readme/curl-demo.png)
+![App Screenshot](./readme/curl-demo.gif)
