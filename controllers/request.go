@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"main/models"
+	"goquest/models"
 )
 
 func DeleteItemFromTable(db *sql.DB, item_id string) error {

@@ -2,8 +2,8 @@ package components
 
 import (
 	"database/sql"
-	"main/controllers"
-	"main/models"
+	"goquest/controllers"
+	"goquest/models"
 	"strconv"
 
 	"github.com/charmbracelet/bubbles/table"

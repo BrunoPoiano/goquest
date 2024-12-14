@@ -2,7 +2,7 @@ package components
 
 import (
 	"fmt"
-	"main/models"
+	"goquest/models"
 	"net/url"
 
 	"github.com/charmbracelet/huh"
