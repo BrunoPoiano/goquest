@@ -90,9 +90,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if !m.ready {
-			m.viewport = viewport.New(msg.Width, msg.Height-15)
-			m.viewport.YPosition = m.height
+
+    if !m.ready {
+			m.viewport = viewport.New(msg.Width, msg.Height-20)
+      m.viewport.YPosition = m.height
 			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
 			m.viewport.SetContent(m.preview)
 			m.viewport.GotoTop()
@@ -168,7 +169,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Headers = m.table.SelectedRow()[5]
 				m.requests = request_form
 				m.form = components.CreateForm(&request_form)
-			m.selected = "form"
+				m.selected = "form"
 			}
 
 		case "esc":
@@ -189,7 +190,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		send := m.form.GetBool("send")
 		if send == true {
 			m.loading = true
-      m.viewport.SetContent("Loading ... ")
+			m.viewport.SetContent("Loading ... ")
 			if huh_form, ok := form.(*huh.Form); ok {
 				m.form = huh_form
 				request_form := models.Requests{}
@@ -198,8 +199,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Route = m.form.GetString("route")
 				request_form.Params = m.form.GetString("params")
 				request_form.Headers = m.form.GetString("headers")
-        
-        m.requests = m.checkForm(request_form)
+
+				m.requests = m.checkForm(request_form)
 				request_cmd := requests.MakeRequest(m.checkForm(request_form), m.db)
 				cmds = append(cmds, request_cmd)
 			}
@@ -246,9 +247,11 @@ func (m model) widthCalc(v_width float64) int {
 
 func (m model) formView(v_width float64) string {
 
+
 	width := m.widthCalc(v_width)
 	form_view := strings.TrimSuffix(m.form.View(), "\n\n")
 	form_render := m.lg.NewStyle().Margin(1, 0).Render(form_view + "\nesc return to form ⸱ crtl+n to new form ⸱ crtl+r to resend request")
+
 
 	if m.selected == "form" {
 		return lipgloss.NewStyle().
@@ -257,6 +260,17 @@ func (m model) formView(v_width float64) string {
 			Width(width).
 			Render(form_render)
 	}
+/*
+    m.viewport = viewport.New(msg.Width, msg.Height-23)
+	  m.form.WithHeight(msg.Height-25 )
+
+    _, form_cmd := m.form.Update(msg)
+		cmds = append(cmds, form_cmd)
+    _, view_cmd := m.viewport.Update(msg)
+		cmds = append(cmds, view_cmd)
+*/
+		
+
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -375,7 +389,7 @@ func (m model) View() string {
 		)
 	}
 
-	return view
+	return lipgloss.NewStyle().Height(m.height).Render(view)
 }
 
 func main() {
@@ -389,7 +403,6 @@ func main() {
 	curl := flag.String("curl", "", "")
 	flag.Parse()
 
-	// Check if flag was provided
 	curlProvided := false
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "curl" {
@@ -405,7 +418,6 @@ func main() {
 				os.Exit(1)
 			}
 			item_request = item
-			fmt.Println("item_request ")
 		}
 	}
 
