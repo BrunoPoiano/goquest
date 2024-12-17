@@ -62,7 +62,6 @@ func initialModel(db *sql.DB, item models.Requests) model {
 }
 
 func (m model) Init() tea.Cmd {
-
 	return m.form.Init()
 }
 
@@ -92,14 +91,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		if !m.ready {
-
 			m.viewport = viewport.New(msg.Width, msg.Height-15)
 			m.viewport.YPosition = m.height
 			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
 			m.viewport.SetContent(m.preview)
-      m.viewport.GotoTop()
-      m.ready = true
-
+			m.viewport.GotoTop()
+			m.ready = true
 		}
 
 		if m.selected == "table" {
@@ -145,23 +142,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.form = components.CreateForm(&empty_form)
 				m.selected = "form"
 				m.sent = false
-
+				m.viewport.SetContent("")
 			}
-
 		case "ctrl+c":
 			return m, tea.Quit
 
-		case "enter":
-
+		case "ctrl+r":
 			switch m.selected {
 			case "preview", "form":
-				if m.sent {
-					m.loading = true
-					cmd = requests.MakeRequest(m.requests, m.db)
-					cmds = append(cmds, cmd)
-				}
+				m.debug = "ctrl+r"
+				m.viewport.SetContent("Loading...")
+				m.loading = true
+				cmd = requests.MakeRequest(m.requests, m.db)
+				cmds = append(cmds, cmd)
+			}
 
-			case "table":
+		case "enter":
+			if m.selected == "table" {
 				request_form := models.Requests{}
 				request_form.Id, _ = strconv.Atoi(m.table.SelectedRow()[0])
 				request_form.Name = m.table.SelectedRow()[1]
@@ -171,13 +168,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Headers = m.table.SelectedRow()[5]
 				m.requests = request_form
 				m.form = components.CreateForm(&request_form)
-				m.sent = false
-				m.selected = "form"
+			m.selected = "form"
 			}
 
 		case "esc":
 			m.selected = "form"
-			m.sent = false
 			m.form = components.CreateForm(&m.requests)
 			return m, m.form.Init()
 
@@ -191,21 +186,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-
-		if f, ok := form.(*huh.Form); ok {
-			m.form = f
-			request_form := models.Requests{}
-			request_form.Method = m.form.GetString("method")
-			request_form.Name = m.form.GetString("name")
-			request_form.Route = m.form.GetString("route")
-			request_form.Params = m.form.GetString("params")
-			request_form.Headers = m.form.GetString("headers")
-			send := m.form.GetBool("send")
-
-			if send == true {
-				m.loading = true
-				cmd = requests.MakeRequest(m.checkForm(request_form), m.db)
-				cmds = append(cmds, cmd)
+		send := m.form.GetBool("send")
+		if send == true {
+			m.loading = true
+      m.viewport.SetContent("Loading ... ")
+			if huh_form, ok := form.(*huh.Form); ok {
+				m.form = huh_form
+				request_form := models.Requests{}
+				request_form.Method = m.form.GetString("method")
+				request_form.Name = m.form.GetString("name")
+				request_form.Route = m.form.GetString("route")
+				request_form.Params = m.form.GetString("params")
+				request_form.Headers = m.form.GetString("headers")
+        
+        m.requests = m.checkForm(request_form)
+				request_cmd := requests.MakeRequest(m.checkForm(request_form), m.db)
+				cmds = append(cmds, request_cmd)
 			}
 		}
 
@@ -235,11 +231,9 @@ func (m model) checkForm(request_form models.Requests) models.Requests {
 		checked_form.Params = request_form.Params
 	}
 
-	/*
-		if len(request_form.Headers) < 400 {
-			checked_form.Headers = request_form.Headers
-		}
-	*/
+	if len(request_form.Headers) < 400 {
+		checked_form.Headers = request_form.Headers
+	}
 
 	return checked_form
 
@@ -253,23 +247,22 @@ func (m model) widthCalc(v_width float64) int {
 func (m model) formView(v_width float64) string {
 
 	width := m.widthCalc(v_width)
-	v := strings.TrimSuffix(m.form.View(), "\n\n")
-	form := m.lg.NewStyle().Margin(1, 0).Render(v + " ⸱ esc return to form ⸱ crtl+n to new form")
+	form_view := strings.TrimSuffix(m.form.View(), "\n\n")
+	form_render := m.lg.NewStyle().Margin(1, 0).Render(form_view + "\nesc return to form ⸱ crtl+n to new form ⸱ crtl+r to resend request")
 
 	if m.selected == "form" {
-
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("1")).
 			Width(width).
-			Render(form)
+			Render(form_render)
 	}
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FFF")).
 		Width(width).
-		Render(form)
+		Render(form_render)
 }
 
 func (m model) tableView() string {
@@ -367,12 +360,14 @@ func (m model) View() string {
 	}
 
 	view := "\n"
-	//view = fmt.Sprintf("selected %s \n Debug %s \n width %d \n\n", m.selected, m.debug, m.width)
+	//view += fmt.Sprintf("selected %s \n Debug %s \n m.sent %t \n\n", m.selected, m.debug, m.sent)
 
 	view += m.tabsView() + "\n\n"
-	if m.selected == "table" {
+
+	switch m.selected {
+	case "table":
 		view += m.tableView()
-	} else {
+	default:
 		view += lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			m.formView(0.4),

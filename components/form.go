@@ -22,6 +22,7 @@ func CreateForm(rf *models.Requests) *huh.Form {
 					huh.NewOption("DELETE", "DELETE"),
 				).
 				Value(&rf.Method),
+
 			huh.NewInput().
 				Key("name").
 				Value(&rf.Name).
@@ -32,9 +33,6 @@ func CreateForm(rf *models.Requests) *huh.Form {
 				Title("URL").
 				Value(&rf.Route).
 				Validate(func(s string) error {
-					if s == "" {
-						return nil
-					}
 					if _, err := url.Parse(s); err != nil {
 						return fmt.Errorf("invalid URL")
 					}
@@ -44,18 +42,25 @@ func CreateForm(rf *models.Requests) *huh.Form {
 				Key("headers").
 				Value(&rf.Headers).
 				CharLimit(400).
-        Title("Headers"),
+				Title("Headers"),
 
 			huh.NewText().
 				Key("params").
 				CharLimit(400).
 				Value(&rf.Params).
 				Title("Body"),
-
-			huh.NewConfirm().
+      
+      huh.NewConfirm().
 				Key("send").
 				Title("Send Request?").
-				Affirmative("Send"),
+				Validate(func(v bool) error {
+					if !v {
+						return fmt.Errorf("Welp, finish up then")
+					}
+					return nil
+				}).
+				Affirmative("Send").
+				Negative("Not yet"),
 		),
 	).
 		WithShowHelp(true).
