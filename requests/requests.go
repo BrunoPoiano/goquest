@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"goquest/controllers"
 	"goquest/models"
+	"io"
 	"net/http"
 	"strings"
 
@@ -90,59 +90,49 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 	if err != nil {
 		return func() tea.Msg {
 			return models.ReturnRequest{
-				Response: "Error ",
-				Error:    err,
+				Response: err.Error(),
 			}
 		}
 	}
 
 	controllers.AddItemsToTable(db, request)
-	prettyRes, err := responseParser(response)
-	if err != nil {
-		return func() tea.Msg {
-			return models.ReturnRequest{
-				Response: "Error getting response",
-				Error:    err,
-			}
-		}
-	}
+	prettyRes := responseParser(response)
 
 	return func() tea.Msg {
 		return models.ReturnRequest{
 			Response: prettyRes,
-			Error:    nil,
 		}
 	}
 
 }
 
-func responseParser(response *http.Request) (string, error) {
+func responseParser(response *http.Request) string {
 
 	res, err := http.DefaultClient.Do(response)
 	if err != nil {
-		return "error making http request:", err
+		return "Error making http request \n" + err.Error()
 	}
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "error reading response body", err
+		return "Error reading response body \n" + err.Error()
 	}
 
-	prettyRes, err := prettyString(string(resBody))
+	prettyRes := prettyString(string(resBody))
 	if err != nil {
-		return "error formating Json", err
+		return string(resBody)
 	}
 
-	return prettyRes, nil
+	return prettyRes
 
 }
 
-func prettyString(str string) (string, error) {
+func prettyString(str string) string {
 	var prettyJSON bytes.Buffer
 	if err := json.Indent(&prettyJSON, []byte(str), "", "    "); err != nil {
-		return "error prettyString func", err
+		return str
 	}
-	return prettyJSON.String(), nil
+	return prettyJSON.String()
 }
 
 func formatHeaders(headers http.Header) string {
