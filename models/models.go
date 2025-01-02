@@ -21,7 +21,6 @@ type HeadersForm struct {
 
 type ReturnRequest struct {
 	Response string
-	Error    error
 }
 
 type ReturnTable struct {

@@ -44,8 +44,6 @@ type model struct {
 	table table.Model
 }
 
-const useHighPerformanceRenderer = false
-
 func initialModel(db *sql.DB, item models.Requests) model {
 	m := model{
 		padding:  2,
@@ -72,13 +70,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case models.ReturnRequest:
-		if msg.Error != nil {
-			m.preview = msg.Response
-			m.viewport.SetContent(msg.Error.Error())
-		} else {
-			m.preview = msg.Response
-			m.viewport.SetContent(msg.Response)
-		}
+		m.preview = msg.Response
+		m.viewport.SetContent(msg.Response)
 		m.selected = "preview"
 		m.loading = false
 
@@ -91,22 +84,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-    if !m.ready {
-			m.viewport = viewport.New(msg.Width, msg.Height-20)
-      m.viewport.YPosition = m.height
-			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
-			m.viewport.SetContent(m.preview)
-			m.viewport.GotoTop()
-			m.ready = true
-		}
+		m.viewport = viewport.New(msg.Width, msg.Height-20)
+		m.viewport.YPosition = msg.Height
+		m.viewport.HighPerformanceRendering = false
+		m.viewport.SetContent(m.preview)
+		m.viewport.GotoTop()
 
 		if m.selected == "table" {
-			cmd = components.Table(m.db, m.widthCalc(1), m.height)
+			cmd = components.Table(m.db, msg.Width - 5, msg.Height)
 			cmds = append(cmds, cmd)
-		}
-
-		if useHighPerformanceRenderer {
-			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
 
 	case tea.KeyMsg:
@@ -129,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = "preview"
 			case "preview":
 				m.loading = true
-				cmd = components.Table(m.db, m.widthCalc(1), m.height)
+				cmd = components.Table(m.db, m.width - 5, m.height)
 				cmds = append(cmds, cmd)
 			case "table":
 				m.selected = "form"
@@ -154,6 +140,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.debug = "ctrl+r"
 				m.viewport.SetContent("Loading...")
 				m.loading = true
+				m.selected = "preview"
 				cmd = requests.MakeRequest(m.requests, m.db)
 				cmds = append(cmds, cmd)
 			}
@@ -200,6 +187,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Params = m.form.GetString("params")
 				request_form.Headers = m.form.GetString("headers")
 
+				m.selected = "preview"
 				m.requests = m.checkForm(request_form)
 				request_cmd := requests.MakeRequest(m.checkForm(request_form), m.db)
 				cmds = append(cmds, request_cmd)
@@ -247,11 +235,11 @@ func (m model) widthCalc(v_width float64) int {
 
 func (m model) formView(v_width float64) string {
 
-
 	width := m.widthCalc(v_width)
 	form_view := strings.TrimSuffix(m.form.View(), "\n\n")
 	form_render := m.lg.NewStyle().Margin(1, 0).Render(form_view + "\nesc return to form ⸱ crtl+n to new form ⸱ crtl+r to resend request")
 
+	m.form.WithHeight(m.viewport.Height + 5)
 
 	if m.selected == "form" {
 		return lipgloss.NewStyle().
@@ -260,17 +248,6 @@ func (m model) formView(v_width float64) string {
 			Width(width).
 			Render(form_render)
 	}
-/*
-    m.viewport = viewport.New(msg.Width, msg.Height-23)
-	  m.form.WithHeight(msg.Height-25 )
-
-    _, form_cmd := m.form.Update(msg)
-		cmds = append(cmds, form_cmd)
-    _, view_cmd := m.viewport.Update(msg)
-		cmds = append(cmds, view_cmd)
-*/
-		
-
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -375,6 +352,7 @@ func (m model) View() string {
 
 	view := "\n"
 	//view += fmt.Sprintf("selected %s \n Debug %s \n m.sent %t \n\n", m.selected, m.debug, m.sent)
+	//height := fmt.Sprintf("Height: %d | viewport height %d", m.height, m.viewport.Height)
 
 	view += m.tabsView() + "\n\n"
 
