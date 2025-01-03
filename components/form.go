@@ -33,6 +33,9 @@ func CreateForm(rf *models.Requests) *huh.Form {
 				Title("URL").
 				Value(&rf.Route).
 				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("Field cannot be empty")
+					}
 					if _, err := url.Parse(s); err != nil {
 						return fmt.Errorf("invalid URL")
 					}
@@ -49,8 +52,8 @@ func CreateForm(rf *models.Requests) *huh.Form {
 				CharLimit(400).
 				Value(&rf.Params).
 				Title("Body"),
-      
-      huh.NewConfirm().
+
+			huh.NewConfirm().
 				Key("send").
 				Title("Send Request?").
 				Validate(func(v bool) error {
@@ -59,7 +62,7 @@ func CreateForm(rf *models.Requests) *huh.Form {
 					}
 					return nil
 				}).
-				Affirmative("Send").
+				Affirmative("Send!").
 				Negative("Not yet"),
 		),
 	).
