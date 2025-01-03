@@ -23,6 +23,10 @@ type ReturnRequest struct {
 	Response string
 }
 
+type ReturnRequestPreparation struct {
+	FormRequest Requests
+}
+
 type ReturnTable struct {
 	Table table.Model
 	Error error
