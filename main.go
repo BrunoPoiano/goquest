@@ -91,7 +91,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoTop()
 
 		if m.selected == "table" {
-			cmd = components.Table(m.db, msg.Width - 5, msg.Height)
+			cmd = components.Table(m.db, msg.Width-5, msg.Height)
 			cmds = append(cmds, cmd)
 		}
 
@@ -115,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = "preview"
 			case "preview":
 				m.loading = true
-				cmd = components.Table(m.db, m.width - 5, m.height)
+				cmd = components.Table(m.db, m.width-5, m.height)
 				cmds = append(cmds, cmd)
 			case "table":
 				m.selected = "form"
@@ -178,6 +178,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if send == true {
 			m.loading = true
 			m.viewport.SetContent("Loading ... ")
+			m.selected = "preview"
 			if huh_form, ok := form.(*huh.Form); ok {
 				m.form = huh_form
 				request_form := models.Requests{}
@@ -187,7 +188,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Params = m.form.GetString("params")
 				request_form.Headers = m.form.GetString("headers")
 
-				m.selected = "preview"
 				m.requests = m.checkForm(request_form)
 				request_cmd := requests.MakeRequest(m.checkForm(request_form), m.db)
 				cmds = append(cmds, request_cmd)
@@ -266,7 +266,6 @@ func (m model) tableView() string {
 		content = fmt.Sprintf("%s \n %s D to delete row ", m.table.View(), m.table.HelpView())
 	}
 	if m.selected == "table" {
-
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("1")).
@@ -284,12 +283,7 @@ func (m model) previewView(v_width float64) string {
 	width := m.widthCalc(v_width)
 	m.viewport.Width = width - m.padding - 5
 
-	content := ""
-	if m.loading {
-		content = "Loading ..."
-	} else {
-		content = fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
-	}
+  content := fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
 
 	if m.selected == "preview" {
 		return lipgloss.NewStyle().
@@ -345,6 +339,17 @@ func (m model) tabsView() string {
 	return actions
 }
 
+func (m model) footerView() string {
+
+	footer := "ctrl+w to switch panes | GOquest | 0.2.2"
+
+	width := (m.width - m.padding) / 2
+	name_version := "GOquest | 0.2.0"
+
+	footer = fmt.Sprintf("%-*s %-*s %s", width, "crtl+w to swtich panes", width-len(name_version), "", name_version)
+	return footer
+}
+
 func (m model) View() string {
 	if m.width == 0 {
 		return "Loading..."
@@ -354,7 +359,7 @@ func (m model) View() string {
 	//view += fmt.Sprintf("selected %s \n Debug %s \n m.sent %t \n\n", m.selected, m.debug, m.sent)
 	//height := fmt.Sprintf("Height: %d | viewport height %d", m.height, m.viewport.Height)
 
-	view += m.tabsView() + "\n\n"
+	view += m.tabsView() + "\n"
 
 	switch m.selected {
 	case "table":
@@ -367,7 +372,9 @@ func (m model) View() string {
 		)
 	}
 
-	return lipgloss.NewStyle().Height(m.height).Render(view)
+	page := lipgloss.JoinVertical(lipgloss.Top, view, m.footerView())
+
+	return lipgloss.NewStyle().Height(m.height).Render(page)
 }
 
 func main() {
