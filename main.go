@@ -80,6 +80,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selected = "table"
 		m.loading = false
 
+	case models.ReturnRequestPreparation:
+
+		request_cmd := requests.MakeRequest(m.checkForm(msg.FormRequest), m.db)
+		cmds = append(cmds, request_cmd)
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -137,12 +142,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+r":
 			switch m.selected {
 			case "preview", "form":
-				m.debug = "ctrl+r"
 				m.viewport.SetContent("Loading...")
-				m.loading = true
 				m.selected = "preview"
-				cmd = requests.MakeRequest(m.requests, m.db)
-				cmds = append(cmds, cmd)
+        m.loading = true
+	
+        cmd = func() tea.Msg {
+					return models.ReturnRequestPreparation{
+						FormRequest: m.requests,
+					}
+				}
+				
+        cmds = append(cmds, cmd)
 			}
 
 		case "enter":
@@ -176,10 +186,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		send := m.form.GetBool("send")
 		if send == true {
-			m.loading = true
-			m.viewport.SetContent("Loading ... ")
-			m.selected = "preview"
 			if huh_form, ok := form.(*huh.Form); ok {
+				m.loading = true
+				m.viewport.SetContent("Loading ... ")
+				m.selected = "preview"
+
 				m.form = huh_form
 				request_form := models.Requests{}
 				request_form.Method = m.form.GetString("method")
@@ -189,8 +200,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				request_form.Headers = m.form.GetString("headers")
 
 				m.requests = m.checkForm(request_form)
-				request_cmd := requests.MakeRequest(m.checkForm(request_form), m.db)
-				cmds = append(cmds, request_cmd)
+
+				cmd = func() tea.Msg {
+					return models.ReturnRequestPreparation{
+						FormRequest: m.requests,
+					}
+				}
+				cmds = append(cmds, cmd)
 			}
 		}
 
@@ -201,9 +217,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "preview":
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
-	}
 
+	}
 	return m, tea.Batch(cmds...)
+
 }
 
 func (m model) checkForm(request_form models.Requests) models.Requests {
@@ -283,7 +300,7 @@ func (m model) previewView(v_width float64) string {
 	width := m.widthCalc(v_width)
 	m.viewport.Width = width - m.padding - 5
 
-  content := fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
+	content := fmt.Sprintf("%s\n%s\n%s", components.HeaderView(m.viewport), m.viewport.View(), components.FooterView(m.viewport))
 
 	if m.selected == "preview" {
 		return lipgloss.NewStyle().
@@ -356,7 +373,7 @@ func (m model) View() string {
 	}
 
 	view := "\n"
-	//view += fmt.Sprintf("selected %s \n Debug %s \n m.sent %t \n\n", m.selected, m.debug, m.sent)
+	view += fmt.Sprintf("selected %s \n loading %t \n ", m.selected, m.loading)
 	//height := fmt.Sprintf("Height: %d | viewport height %d", m.height, m.viewport.Height)
 
 	view += m.tabsView() + "\n"
