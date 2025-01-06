@@ -11,7 +11,6 @@ type Requests struct {
 	Route   string
 	Params  string
 	Headers string
-	//Params url.Values
 }
 
 type HeadersForm struct {
@@ -29,5 +28,4 @@ type ReturnRequestPreparation struct {
 
 type ReturnTable struct {
 	Table table.Model
-	Error error
 }

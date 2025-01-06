@@ -16,27 +16,8 @@ import (
 
 func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 
-	/*
-	   	if strconv.Itoa(request.Id) != "0"{
-	   		return func() tea.Msg {
-	   			return models.ReturnRequest{
-	   				Response: "TEM ID " + request.Headers,
-	   				Error:    nil,
-	   			}
-	   		}
-	     }else{
-	   		return func() tea.Msg {
-	   			return models.ReturnRequest{
-	   				Response: " sem id" +strconv.Itoa(request.Id),
-
-	   				Error:    nil,
-	   			}
-	   		}
-
-	     }
-	*/
-
 	requestMethod := http.MethodGet
+
 	var response *http.Request
 	var err error
 
@@ -76,17 +57,6 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 		}
 	}
 
-	/*
-		    //Check Headers
-
-				return func() tea.Msg {
-					return models.ReturnRequest{
-						Response: formatHeaders(response.Header),
-						Error:    err,
-					}
-				}
-	*/
-
 	if err != nil {
 		return func() tea.Msg {
 			return models.ReturnRequest{
@@ -107,7 +77,6 @@ func MakeRequest(request models.Requests, db *sql.DB) tea.Cmd {
 }
 
 func responseParser(response *http.Request) string {
-
 	res, err := http.DefaultClient.Do(response)
 	if err != nil {
 		return "Error making http request \n" + err.Error()
@@ -119,12 +88,8 @@ func responseParser(response *http.Request) string {
 	}
 
 	prettyRes := prettyString(string(resBody))
-	if err != nil {
-		return string(resBody)
-	}
 
 	return prettyRes
-
 }
 
 func prettyString(str string) string {

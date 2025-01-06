@@ -41,6 +41,7 @@ func CreateForm(rf *models.Requests) *huh.Form {
 					}
 					return nil
 				}),
+
 			huh.NewText().
 				Key("headers").
 				Value(&rf.Headers).
@@ -67,5 +68,5 @@ func CreateForm(rf *models.Requests) *huh.Form {
 		),
 	).
 		WithShowHelp(true).
-		WithShowErrors(true)
+    WithShowErrors(true)
 }
