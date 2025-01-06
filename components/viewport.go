@@ -34,7 +34,3 @@ func  FooterView (viewport viewport.Model) string {
 	line := strings.Repeat("─", max(0, viewport.Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
 }
-
-
-
-

@@ -44,6 +44,8 @@ type model struct {
 	table table.Model
 }
 
+var BorderColor = lipgloss.Color("1")
+
 func initialModel(db *sql.DB, item models.Requests) model {
 	m := model{
 		padding:  2,
@@ -81,7 +83,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 
 	case models.ReturnRequestPreparation:
-
 		request_cmd := requests.MakeRequest(m.checkForm(msg.FormRequest), m.db)
 		cmds = append(cmds, request_cmd)
 
@@ -110,10 +111,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					m.preview = err.Error()
 				} else {
-					m.viewport.SetContent("Item Deleted Successifully")
-					m.selected = "preview"
+         //m.table.SetCursor(m.table.Cursor()-1)
+					cmd = components.Table(m.db, m.width-5, m.height)
+          cmds = append(cmds, cmd)
 				}
-			}
+		}
 		case "ctrl+w":
 			switch m.selected {
 			case "form":
@@ -261,7 +263,7 @@ func (m model) formView(v_width float64) string {
 	if m.selected == "form" {
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("1")).
+			BorderForeground(lipgloss.Color(BorderColor)).
 			Width(width).
 			Render(form_render)
 	}
@@ -285,7 +287,7 @@ func (m model) tableView() string {
 	if m.selected == "table" {
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("1")).
+			BorderForeground(lipgloss.Color(BorderColor)).
 			Render(content)
 	}
 
@@ -305,7 +307,7 @@ func (m model) previewView(v_width float64) string {
 	if m.selected == "preview" {
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("1")).
+			BorderForeground(lipgloss.Color(BorderColor)).
 			Padding(m.padding).
 			Width(width).
 			Render(content)
@@ -373,8 +375,6 @@ func (m model) View() string {
 	}
 
 	view := "\n"
-	view += fmt.Sprintf("selected %s \n loading %t \n ", m.selected, m.loading)
-	//height := fmt.Sprintf("Height: %d | viewport height %d", m.height, m.viewport.Height)
 
 	view += m.tabsView() + "\n"
 

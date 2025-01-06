@@ -20,12 +20,12 @@ func Table(db *sql.DB, width int, height int) tea.Cmd {
 	for _, v := range items {
 		rows = append(rows, table.Row{strconv.Itoa(v.Id), v.Name, v.Method, v.Route, v.Params, v.Headers})
 	}
-	column_w := (width - 24) / 4
+	column_w := (width - 20) / 4
 
 	columns := []table.Column{
 		{Title: "Id", Width: 4},
 		{Title: "Name", Width: column_w},
-		{Title: "Method", Width: 10},
+		{Title: "Method", Width: 6},
 		{Title: "URL", Width: column_w},
 		{Title: "Params", Width: column_w},
 		{Title: "Headers", Width: column_w},
@@ -53,7 +53,6 @@ func Table(db *sql.DB, width int, height int) tea.Cmd {
 	return func() tea.Msg {
 		return models.ReturnTable{
 			Table: t,
-			Error: nil,
 		}
 	}
 }
