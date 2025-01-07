@@ -8,8 +8,8 @@ import (
 	"goquest/controllers"
 	"goquest/database"
 	"goquest/models"
-	"goquest/requests"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -18,6 +18,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 type model struct {
@@ -83,7 +84,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 
 	case models.ReturnRequestPreparation:
-		request_cmd := requests.MakeRequest(m.checkForm(msg.FormRequest), m.db)
+		request_cmd := controllers.MakeRequest(m.checkForm(msg.FormRequest), m.db)
 		cmds = append(cmds, request_cmd)
 
 	case tea.WindowSizeMsg:
@@ -111,11 +112,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					m.preview = err.Error()
 				} else {
-         //m.table.SetCursor(m.table.Cursor()-1)
+					//m.table.SetCursor(m.table.Cursor()-1)
 					cmd = components.Table(m.db, m.width-5, m.height)
-          cmds = append(cmds, cmd)
+					cmds = append(cmds, cmd)
 				}
-		}
+			}
 		case "ctrl+w":
 			switch m.selected {
 			case "form":
@@ -146,15 +147,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "preview", "form":
 				m.viewport.SetContent("Loading...")
 				m.selected = "preview"
-        m.loading = true
-	
-        cmd = func() tea.Msg {
+				m.loading = true
+
+				cmd = func() tea.Msg {
 					return models.ReturnRequestPreparation{
 						FormRequest: m.requests,
 					}
 				}
-				
-        cmds = append(cmds, cmd)
+
+				cmds = append(cmds, cmd)
 			}
 
 		case "enter":
@@ -395,6 +396,20 @@ func (m model) View() string {
 }
 
 func main() {
+
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Println("Not running in a terminal, opening a new terminal session...")
+
+		// Attempt to open a new terminal (using gnome-terminal as an example)
+		err := exec.Command("gnome-terminal").Start()
+		if err != nil {
+			fmt.Println("Failed to open terminal:", err)
+		} else {
+			fmt.Println("Terminal opened successfully.")
+		}
+	} else {
+		fmt.Println("Running in a terminal.")
+	}
 
 	item_request := models.Requests{Method: "GET"}
 	db := database.SqliteDB()
